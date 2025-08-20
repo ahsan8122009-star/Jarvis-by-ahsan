@@ -1,0 +1,211 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS AI</title>
+  <style>
+    body {
+      background: radial-gradient(circle at center, #000428, #004e92);
+      color: cyan;
+      font-family: "Orbitron", sans-serif;
+      text-align: center;
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    h1 { font-size: 3em; text-shadow: 0px 0px 15px cyan; }
+    #jarvis-core {
+      width: 250px; height: 250px;
+      border: 2px solid cyan; border-radius: 50%;
+      display: flex; justify-content: center; align-items: center;
+      font-size: 3em; text-shadow: 0 0 20px cyan;
+      box-shadow: 0 0 40px cyan, inset 0 0 40px cyan;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 20px cyan, inset 0 0 20px cyan; }
+      50% { box-shadow: 0 0 60px cyan, inset 0 0 60px cyan; }
+      100% { box-shadow: 0 0 20px cyan, inset 0 0 20px cyan; }
+    }
+    #status { margin-top: 20px; font-size: 1.2em; text-shadow: 0px 0px 10px cyan; }
+    button {
+      background: black; border: 2px solid cyan; color: cyan;
+      padding: 12px 25px; margin: 10px; font-size: 1.1em;
+      border-radius: 10px; cursor: pointer; transition: 0.3s;
+    }
+    button:hover { background: cyan; color: black; }
+  </style>
+</head>
+<body>
+  <h1>J.A.R.V.I.S SYSTEM</h1>
+  <div id="jarvis-core">J</div>
+  <p id="status">Awaiting command...</p>
+
+  <button onclick="startJarvis()">🎤 Start Listening</button>
+  <button onclick="stopJarvis()">🛑 Stop</button>
+
+  <script>
+    let recognition;
+    let listening = false;
+    let learningMode = false;
+    let lastQuestion = "";
+    let restarting = false;
+
+    function speak(text) {
+      let speech = new SpeechSynthesisUtterance(text);
+      speech.lang = "en-US";
+      window.speechSynthesis.speak(speech);
+    }
+
+    function startJarvis() {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert("Your browser does not support speech recognition.");
+        return;
+      }
+
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onstart = function() {
+        listening = true;
+        document.getElementById("status").innerText = "Listening...";
+        speak("Jarvis online and listening.");
+      };
+
+      recognition.onresult = function(event) {
+        let command = event.results[event.results.length - 1][0].transcript.toLowerCase();
+        document.getElementById("status").innerText = "You said: " + command;
+        executeCommand(command);
+      };
+
+      recognition.onend = function() {
+        if (listening && !restarting) {
+          restarting = true;
+          setTimeout(() => {
+            restarting = false;
+            recognition.start();
+          }, 500); // short delay to avoid mic hang
+        }
+      };
+
+      recognition.onerror = function(event) {
+        console.error("Speech recognition error:", event.error);
+        if (listening && !restarting) {
+          restarting = true;
+          setTimeout(() => {
+            restarting = false;
+            recognition.start();
+          }, 1000);
+        }
+      };
+
+      recognition.start();
+    }
+
+    function stopJarvis() {
+      if (recognition && listening) {
+        listening = false;
+        recognition.stop();
+        document.getElementById("status").innerText = "Jarvis stopped.";
+        speak("Shutting down, sir.");
+      }
+    }
+
+    async function executeCommand(command) {
+      if (command.startsWith("question")) {
+        lastQuestion = command.replace("question", "").trim();
+        learningMode = true;
+        speak("I am ready to learn the answer.");
+        return;
+      }
+      if (command.startsWith("answer") && learningMode) {
+        let ans = command.replace("answer", "").trim();
+        localStorage.setItem(lastQuestion, ans);
+        learningMode = false;
+        speak("Got it! I will remember that.");
+        return;
+      }
+      let storedAnswer = localStorage.getItem(command);
+      if (storedAnswer) { speak(storedAnswer); return; }
+
+      if (command.includes("open google")) { window.open("https://www.google.com", "_blank"); speak("Opening Google."); return; }
+      else if (command.includes("open youtube")) { window.open("https://www.youtube.com", "_blank"); speak("Opening YouTube."); return; }
+
+      else if (command.includes("turn on light")) { fetch("http://10.70.33.73/light/on"); speak("Turning on the light."); return; }
+      else if (command.includes("turn off light")) { fetch("http://10.70.33.73/light/off"); speak("Light is off."); return; }
+      else if (command.includes("turn on fan")) { fetch("http://10.70.33.73/fan/on"); speak("Fan is on."); return; }
+      else if (command.includes("turn off fan")) { fetch("http://10.70.33.73/fan/off"); speak("Fan is off."); return; }
+
+      else if (command.includes("what is") || command.includes("who is")) {
+        let query = command.replace("what is","").replace("who is","").trim();
+        let url = `https://en.wikipedia.org/api/rest_v1/page/summary/${query}`;
+        try { let res = await fetch(url); let data = await res.json(); if(data.extract) speak(data.extract); else speak("I couldn't find an answer."); }
+        catch { speak("Sorry, I had trouble reaching Wikipedia."); }
+        return;
+      }
+
+      const casualReplies = ["anything", "i dont know","ok", "thanks"];
+      if (casualReplies.some(word => command.includes(word))) {
+        const responses = ["Thank you!", "Ok!", "Good!", "Alright!", "Noted!"];
+        speak(responses[Math.floor(Math.random() * responses.length)]);
+        return;
+      }
+
+      speak("Sorry sir, I did not understand.");
+    }
+  </script>
+
+  <!-- === Prayer Alerts in Background Friendly Mode === -->
+  <script src="https://cdn.jsdelivr.net/gh/batoulapps/adhan-js@3.0.1/dist/Adhan.js"></script>
+  <script>
+    function schedulePrayerAlerts() {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const now = new Date();
+        const params = adhan.CalculationMethod.MuslimWorldLeague();
+        const coordinates = new adhan.Coordinates(lat, lon);
+        const prayerTimes = new adhan.PrayerTimes(coordinates, now, params);
+
+        const prayers = ['fajr','dhuhr','asr','maghrib','isha'];
+
+        prayers.forEach(prayer => {
+          const prayerDate = prayerTimes[prayer];
+          const notifyTime = new Date(prayerDate.getTime() - 60000); // 1 min before
+          const nowTime = new Date();
+
+          if (notifyTime > nowTime) {
+            setTimeout(() => speak(`1 minute remaining for ${prayer} prayer`), notifyTime - nowTime);
+          }
+          if (prayerDate > nowTime) {
+            setTimeout(() => speak(`${prayer} prayer time has started`), prayerDate - nowTime);
+          }
+        });
+
+        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+        setTimeout(schedulePrayerAlerts, tomorrow - now);
+      });
+    }
+
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+
+    const originalSpeak = speak;
+    speak = function(text) {
+      originalSpeak(text);
+      if (Notification.permission === "granted") {
+        new Notification("J.A.R.V.I.S Prayer Alert", { body: text, icon: "" });
+      }
+    }
+
+    schedulePrayerAlerts();
+  </script>
+</body>
+</html>
